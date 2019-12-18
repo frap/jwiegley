@@ -138,8 +138,32 @@ users).")
       (eval-print-last-sexp)))
   (load bootstrap-file nil 'nomessage))
 
-   (straight-use-package 'use-package)
-   (straight-use-package-by-default t)
+  ;;;; use-package
+
+;; Package `use-package' provides a handy macro by the same name which
+;; is essentially a wrapper around `with-eval-after-load' with a lot
+;; of handy syntactic sugar and useful features.
+(straight-use-package 'use-package)
+
+;; When configuring a feature with `use-package', also tell
+;; straight.el to install a package of the same name, unless otherwise
+;; specified using the `:straight' keyword.
+(setq straight-use-package-by-default t)
+
+;; Tell `use-package' to always load features lazily unless told
+;; otherwise. It's nicer to have this kind of thing be deterministic:
+;; if `:demand' is present, the loading is eager; otherwise, the
+;; loading is lazy. See
+;; https://github.com/jwiegley/use-package#notes-about-lazy-loading.
+(setq use-package-always-defer t)
+
+(defmacro use-feature (name &rest args)
+  "Like `use-package', but with `straight-use-package-by-default' disabled.
+NAME and ARGS are as in `use-package'."
+  (declare (indent defun))
+  `(use-package ,name
+     :straight nil
+     ,@args))
    
   (defconst load-path-reject-re "/\\.emacs\\.d/\\(lib\\|site-lisp\\)/"
     "Regexp matching `:load-path' values to be rejected.")
@@ -166,12 +190,45 @@ users).")
           use-package-expand-minimally t)))
 
 ;;; Libraries
-(use-package async         :defer t  :load-path "lisp/async")
-(use-package deferred      :defer t)
-(use-package diminish      :demand t)
+;;(use-package async         :defer t  :load-path "lisp/async")
+;; Package `blackout' provides a convenient function for customizing
+;; mode lighters. It supports both major and minor modes with the same
+;; interface, and includes `use-package' integration. The features are
+;; a strict superset of those provided by similar packages `diminish',
+;; `delight', and `dim'.
+(use-package blackout
+  :straight (:host github :repo "raxod502/blackout")
+  :demand t)
+
+
+;;; el-patch
+
+;; Package `el-patch' provides a way to override the definition of an
+;; internal function from another package by providing an s-expression
+;; based diff which can later be validated to ensure that the upstream
+;; definition has not changed.
+(use-package el-patch
+  :straight (:host github
+                   :repo "raxod502/el-patch"
+                   :branch "develop"))
+
+;; Only needed at compile time, thanks to Jon
+;; <https://github.com/raxod502/el-patch/pull/11>.
+(eval-when-compile
+  (require 'el-patch))
+
+;;; Keybindings
+
+;; Package `bind-key' provides a macro by the same name (along with
+;; `bind-key*', `bind-keys', `bind-keys*', and `unbind-key') which
+;; provides a much prettier API for manipulating keymaps than
+;; `define-key' and `global-set-key' do. It's also the same API that
+;; `:bind' and similar keywords in `use-package' use.
+(use-package bind-key
+  :demand t)
 
 (use-package paredit
-  :diminish
+  :blackout t
   :hook ((lisp-mode emacs-lisp-mode) . paredit-mode)
   :bind (:map paredit-mode-map
               ("[")
@@ -205,7 +262,7 @@ users).")
 
 (use-package which-key
   :defer 5
-  :diminish
+  :blackout t
   :commands which-key-mode
   :config
   (which-key-mode))
